@@ -39,6 +39,11 @@ def login():
 
     # Connect to database
     conn = get_db_connection()
+    if conn is None:
+        return jsonify({
+            'error': 'Database connection failed'
+        }), 500
+
     cursor = conn.cursor()
 
     try:
@@ -68,8 +73,9 @@ def login():
             'id': user['id'],
             'full_name': user['full_name'],
             'phone': user['phone'],
+            'is_verified': user['is_verified']
         }
-
+        
         return jsonify({
             'message': 'Login successful',
             'user': user_data,
@@ -117,6 +123,11 @@ def get_user_details():
 
     # Connect to database
     conn = get_db_connection()
+    if conn is None:
+        return jsonify({
+            'error': 'Database connection failed'
+        }), 500
+
     cursor = conn.cursor()
 
     try:
