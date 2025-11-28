@@ -4,7 +4,7 @@ Main application entry point.
 from flask import Flask
 from flask_cors import CORS
 from config import DEBUG
-from db import init_db
+# from db import init_db
 from signup import signup_bp
 from login import login_bp
 from otp import otp_bp, configure_mail
