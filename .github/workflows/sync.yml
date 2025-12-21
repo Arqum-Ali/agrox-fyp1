@@ -16,5 +16,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add space https://huggingface.co/spaces/arhumdoger/agrox-backend || echo "remote exists"
+          git remote add space https://huggingface.co/spaces/Arhm4341/fyp1-backend || echo "remote exists"
           git push --force space main:main
