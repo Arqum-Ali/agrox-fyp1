@@ -1,61 +1,60 @@
-# reminder_views.py - FULL ENGLISH + CLEAN + PROFESSIONAL
+# reminder_views.py - FIXED & FINAL VERSION (Land Preparation + Seed Sowing Done Support)
+
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from db import get_db_connection
 import jwt
 from functools import wraps
+from config import SECRET_KEY
 
-# Replace with your actual secret key (same as login)
-SECRET_KEY = "your-super-secret-key-here"
+reminder_bp = Blueprint("reminder", __name__, url_prefix="/reminder")
 
-reminder_bp = Blueprint("reminder", __name__)
-
-# JWT Token Verification
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get("Authorization", "").replace("Bearer ", "")
-        if not token:
-            return jsonify({"error": "Token is missing"}), 401
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Token missing or invalid format"}), 401
 
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-            current_user_id = data.get("user_id")
+            token = auth_header.split(" ")[1]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            current_user_id = payload["user_id"]
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
         except:
-            return jsonify({"error": "Token error"}), 401
+            return jsonify({"error": "Invalid token"}), 401
 
         return f(current_user_id, *args, **kwargs)
     return decorated
 
 
-# Add New Crop Reminder
+# ADD CROP REMINDER (AB SAB SAHI HAI)
 @reminder_bp.route("/add", methods=["POST"])
 @token_required
 def add_crop_reminder(current_user_id):
     data = request.get_json()
     if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
+        return jsonify({"error": "No data provided"}), 400
 
     crop_name = data.get("crop_name")
     planting_date_str = data.get("planting_date")
     field_name = data.get("field_name")
 
     if not all([crop_name, planting_date_str, field_name]):
-        return jsonify({"error": "crop_name, planting_date, and field_name are required"}), 400
+        return jsonify({"error": "Missing required fields"}), 400
 
     try:
         planting_date = datetime.strptime(planting_date_str, "%Y-%m-%d").date()
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
-    # Auto-calculate important dates
-    first_irrigation = planting_date + timedelta(days=14)
-    second_irrigation = planting_date + timedelta(days=28)
-    urea_dose = planting_date + timedelta(days=35)
+    # Auto dates
+    Land_preparation_date = planting_date + timedelta(days=0)
+    seed_sowing_date      = planting_date + timedelta(days=14)
+    first_irrigation_date = planting_date + timedelta(days=20)
+    second_irrigation_date = planting_date + timedelta(days=28)
+    urea_dose_date        = planting_date + timedelta(days=35)
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -64,26 +63,37 @@ def add_crop_reminder(current_user_id):
         cursor.execute("""
             INSERT INTO crop_reminders (
                 user_id, crop_name, planting_date, field_name,
-                land_preparation_date, seed_sowing_date,
+                Land_preparation_date, seed_sowing_date,
                 first_irrigation_date, second_irrigation_date, urea_dose_date,
+                Land_preparation_done, seed_sowing_done,
+                first_irrigation_done, second_irrigation_done, urea_dose_done,
                 created_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ) VALUES (
+                %s, %s, %s, %s,
+                %s, %s,
+                %s, %s, %s,
+                FALSE, FALSE,
+                FALSE, FALSE, FALSE,
+                NOW()
+            )
         """, (
             current_user_id, crop_name, planting_date, field_name,
-            planting_date, planting_date,
-            first_irrigation, second_irrigation, urea_dose
+            Land_preparation_date, seed_sowing_date,
+            first_irrigation_date, second_irrigation_date, urea_dose_date
         ))
+
         conn.commit()
         return jsonify({"message": "Crop reminder added successfully!"}), 201
+
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": f"Failed to save: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-# Get All My Reminders
+# MY CROPS – AB LAND_PREPARATION AUR SEED_SOWING BHI SAHI AAYENGE
 @reminder_bp.route("/my_crops", methods=["GET"])
 @token_required
 def get_my_reminders(current_user_id):
@@ -93,21 +103,60 @@ def get_my_reminders(current_user_id):
     try:
         cursor.execute("""
             SELECT 
-                id, crop_name, field_name,
-                DATE_FORMAT(planting_date, '%Y-%m-%d') AS planting_date,
-                DATE_FORMAT(first_irrigation_date, '%Y-%m-%d') AS first_irrigation,
-                DATE_FORMAT(second_irrigation_date, '%Y-%m-%d') AS second_irrigation,
-                DATE_FORMAT(urea_dose_date, '%Y-%m-%d') AS urea_dose
+                id, crop_name, field_name, planting_date,
+                Land_preparation_date, seed_sowing_date,
+                first_irrigation_date, second_irrigation_date, urea_dose_date,
+                Land_preparation_done, seed_sowing_done,
+                first_irrigation_done, second_irrigation_done, urea_dose_done
             FROM crop_reminders 
-            WHERE user_id = %s 
-            ORDER BY planting_date DESC
+            WHERE user_id = %s
+            ORDER BY id DESC
         """, (current_user_id,))
-        
+
         rows = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        reminders = [dict(zip(columns, row)) for row in rows]
+        reminders = []
+
+        for row in rows:
+            all_tasks_done = (
+                row["Land_preparation_done"] and 
+                row["seed_sowing_done"] and 
+                row["first_irrigation_done"] and 
+                row["second_irrigation_done"] and 
+                row["urea_dose_done"]
+            )
+            crop_status = "completed" if all_tasks_done else "pending"
+            
+            reminders.append({
+                "id": row["id"],
+                "crop_name": row["crop_name"],
+                "field_name": row["field_name"],
+                "planting_date": row["planting_date"].strftime("%Y-%m-%d"),
+                "crop_status": crop_status,  # Added crop-level status for filtering
+
+                "Land_preparation": {                                
+                    "date": row["Land_preparation_date"].strftime("%Y-%m-%d") if row["Land_preparation_date"] else None,
+                    "done": bool(row["Land_preparation_done"])
+                },
+                "seed_sowing": {
+                    "date": row["seed_sowing_date"].strftime("%Y-%m-%d") if row["seed_sowing_date"] else None,
+                    "done": bool(row["seed_sowing_done"])
+                },
+                "first_irrigation": {
+                    "date": row["first_irrigation_date"].strftime("%Y-%m-%d") if row["first_irrigation_date"] else None,
+                    "done": bool(row["first_irrigation_done"])
+                },
+                "second_irrigation": {
+                    "date": row["second_irrigation_date"].strftime("%Y-%m-%d") if row["second_irrigation_date"] else None,
+                    "done": bool(row["second_irrigation_done"])
+                },
+                "urea_dose": {
+                    "date": row["urea_dose_date"].strftime("%Y-%m-%d") if row["urea_dose_date"] else None,
+                    "done": bool(row["urea_dose_done"])
+                }
+            })
 
         return jsonify({"reminders": reminders}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -115,71 +164,51 @@ def get_my_reminders(current_user_id):
         conn.close()
 
 
-# Today's Tasks (For Mobile App)
-@reminder_bp.route("/today-reminders", methods=["GET"])
+# MARK TASK DONE – AB LAND_PREPARATION AUR SEED_SOWING BHI SUPPORT KAREGA
+@reminder_bp.route("/mark-task-done", methods=["POST"])
 @token_required
-def today_tasks(current_user_id):
-    today = datetime.today().date()
+def mark_task_done(current_user_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    reminder_id = data.get("reminder_id")
+    task_type = data.get("task_type")
+
+    if not reminder_id or not task_type:
+        return jsonify({"error": "Missing reminder_id or task_type"}), 400
+
+    valid_tasks = ["Land_preparation", "seed_sowing", "first_irrigation", "second_irrigation", "urea_dose"]
+    if task_type not in valid_tasks:
+        return jsonify({"error": f"Invalid task_type"}), 400
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    tasks = []
 
     try:
-        # First Irrigation
-        cursor.execute("""
-            SELECT crop_name, field_name 
-            FROM crop_reminders 
-            WHERE user_id = %s AND first_irrigation_date = %s
-        """, (current_user_id, today))
-        for row in cursor.fetchall():
-            tasks.append({
-                "crop_name": row[0],
-                "field_name": row[1],
-                "task": "First Irrigation Needed"
-            })
+        # Check ownership
+        cursor.execute("SELECT user_id FROM crop_reminders WHERE id = %s", (reminder_id,))
+        row = cursor.fetchone()
+        if not row or row["user_id"] != current_user_id:
+            return jsonify({"error": "Not authorized"}), 404
 
-        # Second Irrigation
-        cursor.execute("""
-            SELECT crop_name, field_name 
-            FROM crop_reminders 
-            WHERE user_id = %s AND second_irrigation_date = %s
-        """, (current_user_id, today))
-        for row in cursor.fetchall():
-            tasks.append({
-                "crop_name": row[0],
-                "field_name": row[1],
-                "task": "Second Irrigation Needed"
-            })
+        # Map task_type → correct column
+        column_map = {
+            "Land_preparation": "Land_preparation_done",
+            "seed_sowing": "seed_sowing_done",
+            "first_irrigation": "first_irrigation_done",
+            "second_irrigation": "second_irrigation_done",
+            "urea_dose": "urea_dose_done"
+        }
+        column = column_map[task_type]
 
-        # Urea Dose
-        cursor.execute("""
-            SELECT crop_name, field_name 
-            FROM crop_reminders 
-            WHERE user_id = %s AND urea_dose_date = %s
-        """, (current_user_id, today))
-        for row in cursor.fetchall():
-            tasks.append({
-                "crop_name": row[0],
-                "field_name": row[1],
-                "task": "Apply Urea Fertilizer"
-            })
+        cursor.execute(f"UPDATE crop_reminders SET {column} = TRUE WHERE id = %s", (reminder_id,))
+        conn.commit()
 
-        if tasks:
-            return jsonify({
-                "success": True,
-                "message": f"You have {len(tasks)} task(s) today!",
-                "total_tasks": len(tasks),
-                "tasks": tasks
-            })
-        else:
-            return jsonify({
-                "success": True,
-                "message": "No tasks today! Enjoy your day",
-                "total_tasks": 0,
-                "tasks": []
-            })
+        return jsonify({"success": True, "message": f"{task_type.replace('_', ' ').title()} marked as done!"}), 200
 
     except Exception as e:
+        conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()

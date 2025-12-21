@@ -1,29 +1,66 @@
+"""
+Main application entry point.
+"""
 from flask import Flask, jsonify
 from flask_cors import CORS
-import os
+from config import DEBUG, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from db import init_db
+from signup import signup_bp
+from login import login_bp
+from otp import otp_bp
+from wheat_listing import wheat_listing
+from machinery_rentals import machinery_rental
+from pesticide_listing import pesticide_listing
+from reminder_views import reminder_bp
+from chat import chat_bp
+from machinery_rentals_display import machinery_display
+import cloudinary
+import cloudinary.uploader
 
-# Ye 2 lines sabse pehle
-os.environ['PYTHONUNBUFFERED'] = '1'
-print("Starting backend...")
+def create_app():
+    app = Flask(__name__)
 
-app = Flask(__name__)
-CORS(app)  # Flutter ke liye
+    CORS(app, resources={r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }})
 
-# Simple test route
-@app.route("/")
-def home():
-    return "BHAI BACKEND LIVE HO GAYA — AB SAB CHALEGA!"
+    app.secret_key = '123789'
 
-# Signup route (sirf test ke liye)
-@app.route("/signup", methods=["POST"])
-def signup():
-    return jsonify({"message": "Signup working!", "status": "success"})
+    # Cloudinary init
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
 
-# Login route
-@app.route("/login", methods=["POST"])
-def login():
-    return jsonify({"message": "Login working!", "status": "success"})
+    # Blueprints
+    app.register_blueprint(signup_bp, url_prefix='/signup')
+    app.register_blueprint(login_bp, url_prefix='/login')
+    app.register_blueprint(otp_bp, url_prefix='/otp')
+    app.register_blueprint(wheat_listing, url_prefix='/wheat_listing')
+    app.register_blueprint(machinery_rental, url_prefix='/machinery')
+    app.register_blueprint(pesticide_listing, url_prefix='/pesticide_listing')
+    app.register_blueprint(reminder_bp, url_prefix="/reminder")
+    app.register_blueprint(chat_bp, url_prefix='/chat')
+    app.register_blueprint(machinery_display, url_prefix='')
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    @app.route('/')
+    def home():
+        return "Backend is running! Go to /machinery/rent_machinery to list machinery"
+
+    return app
+
+
+if __name__ == '__main__':
+    if init_db():
+        app = create_app()
+        print("Starting server...")
+        print("Local: http://127.0.0.1:5000")
+        app.run(host="0.0.0.0", port=5000, debug=DEBUG)
+    else:
+        print("Database connection failed!")

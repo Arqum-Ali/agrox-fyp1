@@ -4,68 +4,54 @@ Handles chat rooms and messages between buyers and sellers.
 """
 from flask import Blueprint, request, jsonify
 from db import get_db_connection
-import jwt
+from auth import verify_token
 from datetime import datetime
 
 # Create a Blueprint for chat routes
 chat_bp = Blueprint('chat', __name__)
 
-# Secret key for JWT (must match login.py)
-SECRET_KEY = 'your-secret-key'
 
-def verify_token():
-    """
-    Verify JWT token from Authorization header.
-    Returns user_id if valid, None otherwise.
-    """
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return None
-    
-    token = auth_header.split(' ')[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        return payload.get('user_id')
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
+# ==================== CREATE OR GET CHAT ROOM ====================
 @chat_bp.route('/rooms', methods=['POST'])
 def create_or_get_room():
-    """
-    Create a new chat room or get existing one between two users for a listing.
-    
-    Expects JSON with:
-    - listing_id: The wheat listing ID
-    
-    Returns:
-        JSON response with room_id
-    """
+    """Create new chat room or get existing one"""
     try:
         user_id = verify_token()
-        print(f"[v0] Token verified, user_id: {user_id}")
-        
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
         
         data = request.get_json()
         listing_id = data.get('listing_id')
-        seller_id = data.get('seller_id')   # 👈 frontend se aa rahi value
-        buyer_id = user_id  
+        listing_type = data.get('listing_type', 'wheat')  # wheat, pesticide, machinery
         
-        print(f"[v0] Request data - listing_id: {listing_id}")
+        print(f"[CHAT] User {user_id} requesting chat for {listing_type} listing {listing_id}")
         
+        # Validate inputs
         if not listing_id:
-            return jsonify({'error': 'Missing listing_id'}), 400
+            return jsonify({'error': 'listing_id is required'}), 400
+        
+        if listing_type not in ['wheat', 'pesticide', 'machinery']:
+            return jsonify({'error': 'Invalid listing_type'}), 400
+        
+        try:
+            listing_id = int(listing_id)
+        except ValueError:
+            return jsonify({'error': 'Invalid listing_id format'}), 400
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        print("[v0] Database connection established")
+        # Get listing owner based on type
+        table_map = {
+            'wheat': 'wheat_listings',
+            'pesticide': 'pesticides',
+            'machinery': 'machinery_rentals'
+        }
         
-        cursor.execute("""
-            SELECT user_id FROM wheat_listings WHERE id = %s
+        table_name = table_map[listing_type]
+        
+        cursor.execute(f"""
+            SELECT user_id FROM {table_name} WHERE id = %s
         """, (listing_id,))
         
         listing = cursor.fetchone()
@@ -73,100 +59,87 @@ def create_or_get_room():
         if not listing:
             cursor.close()
             conn.close()
-            return jsonify({'error': 'Listing not found'}), 404
+            return jsonify({'error': f'{listing_type.capitalize()} listing not found'}), 404
         
         seller_id = listing['user_id']
         buyer_id = user_id
         
-        print(f"[v0] Listing found - seller_id: {seller_id}, buyer_id: {buyer_id}")
-        
-        # Prevent user from chatting with themselves
+        # Prevent self-chat
         if buyer_id == seller_id:
             cursor.close()
             conn.close()
             return jsonify({'error': 'Cannot chat with yourself'}), 400
         
-        # Check if room already exists between these users for this listing
+        print(f"[CHAT] Buyer: {buyer_id}, Seller: {seller_id}")
+        
+        # Check existing room
         cursor.execute("""
             SELECT id FROM chat_rooms 
             WHERE listing_id = %s 
-            AND buyer_id = %s 
-            AND seller_id = %s
-        """, (listing_id, buyer_id, seller_id))
+            AND listing_type = %s
+            AND ((buyer_id = %s AND seller_id = %s) 
+                 OR (buyer_id = %s AND seller_id = %s))
+        """, (listing_id, listing_type, buyer_id, seller_id, seller_id, buyer_id))
         
         existing_room = cursor.fetchone()
-        print(f"[v0] Existing room check: {existing_room}")
         
         if existing_room:
             room_id = existing_room['id']
-            print(f"[v0] Found existing room: {room_id}")
+            print(f"[CHAT] Existing room found: {room_id}")
             cursor.close()
             conn.close()
-            return jsonify({'room_id': room_id}), 200
+            return jsonify({'room_id': room_id, 'other_user_id': seller_id}), 200
         
-        print("[v0] Creating new room")
+        # Create new room
         cursor.execute("""
-            INSERT INTO chat_rooms (buyer_id, seller_id, listing_id)
-            VALUES (%s, %s, %s)
-        """, (buyer_id, seller_id, listing_id))
+            INSERT INTO chat_rooms (buyer_id, seller_id, listing_id, listing_type)
+            VALUES (%s, %s, %s, %s)
+        """, (buyer_id, seller_id, listing_id, listing_type))
         conn.commit()
         
         room_id = cursor.lastrowid
-        print(f"[v0] Created new room with id: {room_id}")
+        print(f"[CHAT] New room created: {room_id}")
         
         cursor.close()
         conn.close()
         
-        return jsonify({'room_id': room_id}), 201
+        return jsonify({'room_id': room_id, 'other_user_id': seller_id}), 201
         
     except Exception as e:
-        print(f"[v0] ERROR in create_or_get_room: {str(e)}")
-        print(f"[v0] Error type: {type(e).__name__}")
-        import traceback
-        print(f"[v0] Traceback: {traceback.format_exc()}")
-        
+        print(f"[CHAT ERROR] create_or_get_room: {str(e)}")
         if 'conn' in locals():
             conn.rollback()
             if 'cursor' in locals():
                 cursor.close()
             conn.close()
-        
-        return jsonify({'error': f'Failed to create room: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
 
+
+# ==================== GET USER'S CHAT ROOMS ====================
 @chat_bp.route('/rooms', methods=['GET'])
 def get_user_rooms():
-    """
-    Get all chat rooms for the authenticated user.
-    
-    Returns:
-        JSON response with list of rooms including other user's name and listing title
-    """
-    user_id = verify_token()
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
+    """Get all chat rooms for current user"""
     try:
+        user_id = verify_token()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         cursor.execute("""
             SELECT 
-                cr.id,
-                cr.buyer_id,
-                cr.seller_id,
+                cr.id as room_id,
                 cr.listing_id,
+                cr.listing_type,
                 cr.created_at,
                 cr.updated_at,
-                wl.title as listing_title,
-                wl.price_per_kg,
                 CASE 
-                    WHEN cr.buyer_id = %s THEN u_seller.full_name
-                    ELSE u_buyer.full_name
-                END as other_user_name,
-                CASE 
-                    WHEN cr.buyer_id = %s THEN cr.seller_id
-                    ELSE cr.buyer_id
+                    WHEN cr.buyer_id = %s THEN cr.seller_id 
+                    ELSE cr.buyer_id 
                 END as other_user_id,
+                u.full_name as other_user_name,
+                'placeholder.jpg' as other_user_image,
                 (SELECT message FROM chat_messages 
                  WHERE room_id = cr.id 
                  ORDER BY created_at DESC LIMIT 1) as last_message,
@@ -178,173 +151,242 @@ def get_user_rooms():
                  AND sender_id != %s 
                  AND is_read = FALSE) as unread_count
             FROM chat_rooms cr
-            JOIN wheat_listings wl ON cr.listing_id = wl.id
-            JOIN users u_buyer ON cr.buyer_id = u_buyer.id
-            JOIN users u_seller ON cr.seller_id = u_seller.id
+            JOIN users u ON u.id = CASE 
+                WHEN cr.buyer_id = %s THEN cr.seller_id 
+                ELSE cr.buyer_id 
+            END
             WHERE cr.buyer_id = %s OR cr.seller_id = %s
             ORDER BY cr.updated_at DESC
         """, (user_id, user_id, user_id, user_id, user_id))
         
         rooms = cursor.fetchall()
-        return jsonify(rooms), 200
         
-    except Exception as e:
-        return jsonify({'error': f'Failed to fetch rooms: {str(e)}'}), 500
-    finally:
         cursor.close()
         conn.close()
+        
+        return jsonify({'rooms': rooms}), 200
+        
+    except Exception as e:
+        print(f"[CHAT ERROR] get_user_rooms: {str(e)}")
+        if 'conn' in locals():
+            if 'cursor' in locals():
+                cursor.close()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
 
+
+# ==================== GET CHAT MESSAGES ====================
 @chat_bp.route('/rooms/<int:room_id>/messages', methods=['GET'])
 def get_messages(room_id):
-    """
-    Get all messages for a specific chat room.
-    
-    Returns:
-        JSON response with list of messages
-    """
-    user_id = verify_token()
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
+    """Get all messages in a chat room"""
     try:
+        user_id = verify_token()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         # Verify user is part of this room
         cursor.execute("""
-            SELECT * FROM chat_rooms 
-            WHERE id = %s AND (buyer_id = %s OR seller_id = %s)
-        """, (room_id, user_id, user_id))
+            SELECT buyer_id, seller_id FROM chat_rooms WHERE id = %s
+        """, (room_id,))
         
         room = cursor.fetchone()
+        
         if not room:
-            return jsonify({'error': 'Room not found or unauthorized'}), 404
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Room not found'}), 404
         
-        # Mark messages as read
-        cursor.execute("""
-            UPDATE chat_messages 
-            SET is_read = TRUE 
-            WHERE room_id = %s AND sender_id != %s
-        """, (room_id, user_id))
-        conn.commit()
+        if user_id not in [room['buyer_id'], room['seller_id']]:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Access denied'}), 403
         
-        # Get all messages
+        # Get messages
         cursor.execute("""
             SELECT 
                 cm.id,
-                cm.room_id,
                 cm.sender_id,
                 cm.message,
-                cm.created_at,
                 cm.is_read,
-                u.full_name as sender_name
+                cm.created_at,
+                u.full_name as sender_name,
+               'placeholder.jpg' as sender_image
             FROM chat_messages cm
-            JOIN users u ON cm.sender_id = u.id
+            JOIN users u ON u.id = cm.sender_id
             WHERE cm.room_id = %s
             ORDER BY cm.created_at ASC
         """, (room_id,))
         
         messages = cursor.fetchall()
-        return jsonify(messages), 200
         
-    except Exception as e:
-        return jsonify({'error': f'Failed to fetch messages: {str(e)}'}), 500
-    finally:
+        # Mark messages as read
+        cursor.execute("""
+            UPDATE chat_messages 
+            SET is_read = TRUE 
+            WHERE room_id = %s AND sender_id != %s AND is_read = FALSE
+        """, (room_id, user_id))
+        conn.commit()
+        
         cursor.close()
         conn.close()
+        
+        return jsonify({'messages': messages}), 200
+        
+    except Exception as e:
+        print(f"[CHAT ERROR] get_messages: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            if 'cursor' in locals():
+                cursor.close()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
 
+
+# ==================== SEND MESSAGE ====================
 @chat_bp.route('/rooms/<int:room_id>/messages', methods=['POST'])
 def send_message(room_id):
-    """
-    Send a message in a chat room.
-    
-    Expects JSON with:
-    - message: The message text
-    
-    Returns:
-        JSON response with message details
-    """
-    user_id = verify_token()
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    message = data.get('message')
-    
-    if not message or not message.strip():
-        return jsonify({'error': 'Message cannot be empty'}), 400
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
+    """Send a message in chat room"""
     try:
+        user_id = verify_token()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        
+        if not message:
+            return jsonify({'error': 'Message cannot be empty'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         # Verify user is part of this room
         cursor.execute("""
-            SELECT * FROM chat_rooms 
-            WHERE id = %s AND (buyer_id = %s OR seller_id = %s)
-        """, (room_id, user_id, user_id))
+            SELECT buyer_id, seller_id FROM chat_rooms WHERE id = %s
+        """, (room_id,))
         
         room = cursor.fetchone()
+        
         if not room:
-            return jsonify({'error': 'Room not found or unauthorized'}), 404
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Room not found'}), 404
+        
+        if user_id not in [room['buyer_id'], room['seller_id']]:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Access denied'}), 403
         
         # Insert message
         cursor.execute("""
             INSERT INTO chat_messages (room_id, sender_id, message)
             VALUES (%s, %s, %s)
-        """, (room_id, user_id, message.strip()))
+        """, (room_id, user_id, message))
         
-        # Update room's updated_at timestamp
+        message_id = cursor.lastrowid
+        
+        # Update room's updated_at
         cursor.execute("""
-            UPDATE chat_rooms 
-            SET updated_at = CURRENT_TIMESTAMP 
-            WHERE id = %s
+            UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = %s
         """, (room_id,))
         
         conn.commit()
-        message_id = cursor.lastrowid
         
         # Get the created message
         cursor.execute("""
             SELECT 
                 cm.id,
-                cm.room_id,
                 cm.sender_id,
                 cm.message,
-                cm.created_at,
                 cm.is_read,
-                u.full_name as sender_name
+                cm.created_at,
+                u.full_name as sender_name,
+              'placeholder.jpg' as sender_image
             FROM chat_messages cm
-            JOIN users u ON cm.sender_id = u.id
+            JOIN users u ON u.id = cm.sender_id
             WHERE cm.id = %s
         """, (message_id,))
         
-        created_message = cursor.fetchone()
-        return jsonify(created_message), 201
+        new_message = cursor.fetchone()
         
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': f'Failed to send message: {str(e)}'}), 500
-    finally:
         cursor.close()
         conn.close()
+        
+        return jsonify({'message': new_message}), 201
+        
+    except Exception as e:
+        print(f"[CHAT ERROR] send_message: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            if 'cursor' in locals():
+                cursor.close()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
 
+
+# ==================== DELETE CHAT ROOM ====================
+@chat_bp.route('/rooms/<int:room_id>', methods=['DELETE'])
+def delete_room(room_id):
+    """Delete a chat room"""
+    try:
+        user_id = verify_token()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verify user is part of this room
+        cursor.execute("""
+            SELECT buyer_id, seller_id FROM chat_rooms WHERE id = %s
+        """, (room_id,))
+        
+        room = cursor.fetchone()
+        
+        if not room:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Room not found'}), 404
+        
+        if user_id not in [room['buyer_id'], room['seller_id']]:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Delete room (messages will be deleted via CASCADE)
+        cursor.execute("DELETE FROM chat_rooms WHERE id = %s", (room_id,))
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Chat deleted successfully'}), 200
+        
+    except Exception as e:
+        print(f"[CHAT ERROR] delete_room: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            if 'cursor' in locals():
+                cursor.close()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== GET UNREAD COUNT ====================
 @chat_bp.route('/unread-count', methods=['GET'])
 def get_unread_count():
-    """
-    Get total unread message count for the authenticated user.
-    
-    Returns:
-        JSON response with unread count
-    """
-    user_id = verify_token()
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
+    """Get total unread message count for the authenticated user"""
     try:
+        user_id = verify_token()
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         cursor.execute("""
             SELECT COUNT(*) as unread_count
             FROM chat_messages cm
@@ -355,39 +397,17 @@ def get_unread_count():
         """, (user_id, user_id, user_id))
         
         result = cursor.fetchone()
-        return jsonify({'unread_count': result['unread_count']}), 200
-        
-    except Exception as e:
-        return jsonify({'error': f'Failed to fetch unread count: {str(e)}'}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-@chat_bp.route('/debug/check-tables', methods=['GET'])
-def check_tables():
-    """
-    Debug endpoint to check if chat tables exist in database.
-    """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Check if chat_rooms table exists
-        cursor.execute("SHOW TABLES LIKE 'chat_rooms'")
-        chat_rooms_exists = cursor.fetchone() is not None
-        
-        # Check if chat_messages table exists
-        cursor.execute("SHOW TABLES LIKE 'chat_messages'")
-        chat_messages_exists = cursor.fetchone() is not None
+        unread_count = result['unread_count'] if result else 0
         
         cursor.close()
         conn.close()
         
-        return jsonify({
-            'chat_rooms_table_exists': chat_rooms_exists,
-            'chat_messages_table_exists': chat_messages_exists,
-            'message': 'If both are False, please run the SQL script: scripts/create_chat_tables.sql'
-        }), 200
+        return jsonify({'unread_count': unread_count}), 200
         
     except Exception as e:
-        return jsonify({'error': f'Database check failed: {str(e)}'}), 500
+        print(f"[CHAT ERROR] get_unread_count: {str(e)}")
+        if 'conn' in locals():
+            if 'cursor' in locals():
+                cursor.close()
+            conn.close()
+        return jsonify({'error': str(e)}), 500

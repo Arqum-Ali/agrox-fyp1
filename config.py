@@ -1,16 +1,26 @@
-import os
+# config.py - Updated for Resend + Cloudinary + Supabase
 
-# ========= DATABASE (Railway MySQL) =========
-DB_HOST       = os.environ.get('MYSQLHOST')
-DB_PORT       = int(os.environ.get('MYSQLPORT', 3306))
-DB_USER       = os.environ.get('MYSQLUSER')
-DB_PASSWORD   = os.environ.get('MYSQLPASSWORD')
-DB_NAME       = os.environ.get('MYSQLDATABASE')
+# JWT Secret Key
+SECRET_KEY = "your-secret-key"  # Change to strong key in production
 
-# ========= RESEND.COM (Email 100% jayegi) =========
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-FROM_EMAIL     = os.environ.get('FROM_EMAIL', 'onboarding@resend.dev')
-
-# ========= APP =========
+# App settings
 DEBUG = True
-SECRET_KEY = os.environ.get('SECRET_KEY', 'my-super-secret-key-2025')
+
+# Base URL (local ke liye)
+BASE_URL = "http://127.0.0.1:5000"
+
+# Cloudinary Settings (already working)
+CLOUDINARY_CLOUD_NAME = 'dybxiiypm'
+CLOUDINARY_API_KEY = '877246594525295'
+CLOUDINARY_API_SECRET = 'IHHSJZDhUZaOG3-NiO-KfVzVKXY'
+
+# Resend Email Settings (new - Gmail ki jagah)
+RESEND_API_KEY = "re_SB36d9dp_LcLwKq3kAhnZacXnyyc3MBG3"
+RESEND_FROM_EMAIL = "onboarding@resend.dev"  # Default free email, baad mein custom domain verify kar sakte ho
+
+# Supabase Database Settings (separate parameters for Windows)
+SUPABASE_DB_HOST = "db.anfswqbjnasjcsllvibh.supabase.co"
+SUPABASE_DB_PORT = "5432"
+SUPABASE_DB_NAME = "postgres"
+SUPABASE_DB_USER = "postgres"
+SUPABASE_DB_PASSWORD = "ARhamali123@"  # Tera password
