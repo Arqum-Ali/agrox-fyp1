@@ -65,7 +65,7 @@ def add_crop_reminder(current_user_id):
                 user_id, crop_name, planting_date, field_name,
                 land_preparation_date, seed_sowing_date,
                 first_irrigation_date, second_irrigation_date, urea_dose_date,
-                land_preparation_done, seed_sowing_done,
+                Land_preparation_done, seed_sowing_done,
                 first_irrigation_done, second_irrigation_done, urea_dose_done,
                 created_at
             ) VALUES (
@@ -106,7 +106,7 @@ def get_my_reminders(current_user_id):
                 id, crop_name, field_name, planting_date,
                 land_preparation_date, seed_sowing_date,
                 first_irrigation_date, second_irrigation_date, urea_dose_date,
-                land_preparation_done, seed_sowing_done,
+                Land_preparation_done, seed_sowing_done,
                 first_irrigation_done, second_irrigation_done, urea_dose_done
             FROM crop_reminders 
             WHERE user_id = %s
@@ -118,7 +118,7 @@ def get_my_reminders(current_user_id):
 
         for row in rows:
             all_tasks_done = (
-                row["land_preparation_done"] and 
+                row["Land_preparation_done"] and 
                 row["seed_sowing_done"] and 
                 row["first_irrigation_done"] and 
                 row["second_irrigation_done"] and 
@@ -135,7 +135,7 @@ def get_my_reminders(current_user_id):
 
                 "land_preparation": {                                
                     "date": row["land_preparation_date"].strftime("%Y-%m-%d") if row["land_preparation_date"] else None,
-                    "done": bool(row["land_preparation_done"])
+                    "done": bool(row["Land_preparation_done"])
                 },
                 "seed_sowing": {
                     "date": row["seed_sowing_date"].strftime("%Y-%m-%d") if row["seed_sowing_date"] else None,
@@ -194,7 +194,7 @@ def mark_task_done(current_user_id):
 
         # Map task_type → correct column
         column_map = {
-            "land_preparation": "land_preparation_done",
+            "land_preparation": "Land_preparation_done",
             "seed_sowing": "seed_sowing_done",
             "first_irrigation": "first_irrigation_done",
             "second_irrigation": "second_irrigation_done",
