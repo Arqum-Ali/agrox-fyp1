@@ -37,7 +37,7 @@ def create_app():
     app.register_blueprint(pesticide_listing, url_prefix='/pesticide_listing')
     app.register_blueprint(reminder_bp, url_prefix='/reminder')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    # app.register_blueprint(machinery_display)  # <-- Ye line comment kar di (error fix)
+    # app.register_blueprint(machinery_display)  # <-- Ye line bhi comment kar di
 
     @app.route('/')
     def home():
