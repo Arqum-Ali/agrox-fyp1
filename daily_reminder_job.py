@@ -7,8 +7,7 @@ import requests
 
 # Resend API key (Railway mein add ki hui hogi signup ke liye)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-RESEND_FROM_EMAIL = "reminders@resend.dev"  # ya jo tu ne banaya wo daal
-
+FROM_EMAIL = "reminders@resend.dev"  # <-- RESEND_ hata de, sirf FROM_EMAIL rakh
 def send_daily_reminders():
     today = date.today()
     print(f"[{today}] Daily Reminder Job Start — Resend se emails bhej raha hai")
