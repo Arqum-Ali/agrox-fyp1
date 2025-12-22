@@ -1,35 +1,40 @@
-# daily_reminder_job.py - Direct Resend API call (same as signup/OTP style)
+# daily_reminder_job.py - FULL UPDATED VERSION (Land Preparation + Seed Sowing included + Resend API)
 
 from db import get_db_connection
 from datetime import date
 import os
 import requests
 
-# Railway environment variable se key le ga (jo tu ne signup ke liye add ki hai)
+# Resend API key (Railway mein add ki hui hogi signup ke liye)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 RESEND_FROM_EMAIL = "reminders@resend.dev"  # ya jo tu ne banaya wo daal
 
 def send_daily_reminders():
     today = date.today()
-    print(f"[{today}] Daily Reminder Job Start — Resend API se emails bhej raha hai")
+    print(f"[{today}] Daily Reminder Job Start — Resend se emails bhej raha hai")
 
     if not RESEND_API_KEY:
-        print("Error: RESEND_API_KEY nahi mili — Railway variables mein add karo")
+        print("Error: RESEND_API_KEY nahi mili — Railway variables mein check karo")
         return
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
+        # Sab 5 tasks check kar raha hai ab (Land Preparation + Seed Sowing bhi include)
         cursor.execute("""
             SELECT 
                 u.email,
                 COALESCE(u.full_name, 'Farmer') as full_name,
                 c.crop_name,
                 c.field_name,
+                c.land_preparation_date,
+                c.seed_sowing_date,
                 c.first_irrigation_date,
                 c.second_irrigation_date,
                 c.urea_dose_date,
+                c.land_preparation_done,
+                c.seed_sowing_done,
                 c.first_irrigation_done,
                 c.second_irrigation_done,
                 c.urea_dose_done
@@ -37,11 +42,13 @@ def send_daily_reminders():
             JOIN users u ON c.user_id = u.id
             WHERE u.email IS NOT NULL AND u.email != ''
               AND (
+                (c.land_preparation_date <= %s AND c.land_preparation_done = FALSE) OR
+                (c.seed_sowing_date <= %s AND c.seed_sowing_done = FALSE) OR
                 (c.first_irrigation_date <= %s AND c.first_irrigation_done = FALSE) OR
                 (c.second_irrigation_date <= %s AND c.second_irrigation_done = FALSE) OR
                 (c.urea_dose_date <= %s AND c.urea_dose_done = FALSE)
               )
-        """, (today, today, today))
+        """, (today, today, today, today, today))
 
         rows = cursor.fetchall()
 
@@ -69,6 +76,9 @@ def send_daily_reminders():
                         status = f"{days} din pehle"
                     users[email]["tasks"].append(f"• {row['crop_name']} ({row['field_name']}) — {name} ({status})")
 
+            # Sab 5 tasks add kar diye
+            add_task("Land Preparation", "land_preparation_date", "land_preparation_done")
+            add_task("Seed Sowing", "seed_sowing_date", "seed_sowing_done")
             add_task("Pehli Irrigation", "first_irrigation_date", "first_irrigation_done")
             add_task("Doosri Irrigation", "second_irrigation_date", "second_irrigation_done")
             add_task("Urea Dalna", "urea_dose_date", "urea_dose_done")
@@ -81,7 +91,7 @@ def send_daily_reminders():
             task_list = "<br>".join(data["tasks"])
 
             payload = {
-                "from": RESEND_FROM_EMAIL,
+                "from": FROM_EMAIL,
                 "to": [email],
                 "subject": "AgroX Reminder — Aaj Ke Zaroori Kaam!",
                 "html": f"""
@@ -103,15 +113,13 @@ def send_daily_reminders():
                 "Content-Type": "application/json"
             }
 
-            url = "https://api.resend.com/emails"
-
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
                 if response.status_code == 200:
                     print(f"Email successfully bheji → {email}")
                     sent_count += 1
                 else:
-                    print(f"Resend error → {email} | {response.json()}")
+                    print(f"Resend error → {email} | {response.text}")
             except Exception as e:
                 print(f"Email send fail → {email} | {e}")
 
