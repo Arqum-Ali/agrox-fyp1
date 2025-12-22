@@ -128,7 +128,7 @@ def rent_machinery():
         
         sql = '''
             INSERT INTO machinery_rentals 
-            (user_id, machinery_type_id, name, description, daily_rate, min_days, start_date, end_date, image_path)
+            (user_id, machinery_type_id, name, description, daily_rate, min_days, start_date, end_date, image_url)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
         cursor.execute(sql, (user_id, machinery_type_id, name, description, daily_rate, min_days, start_date, end_date, image_url))
