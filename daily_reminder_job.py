@@ -1,13 +1,21 @@
-# daily_reminder_job.py - FINAL VERSION (no circular import — live pe perfectly chalega)
+# daily_reminder_job.py - Resend API se emails bhejega (same as signup/forget)
 
 from db import get_db_connection
-from config import mail
 from datetime import date
-from flask_mail import Message
+import os
+import requests
+
+# Railway environment variable se Resend API key le ga (jo tu ne signup ke liye add ki hai)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+FROM_EMAIL = "arhumdoger@gmail.com"  # Ya jo verified email hai Resend mein
 
 def send_daily_reminders():
     today = date.today()
-    print(f"[{today}] Daily Reminder Job Shuru Ho Gaya...")
+    print(f"[{today}] Daily Reminder Job Shuru Ho Gaya... (Resend se emails bhej raha hai)")
+
+    if not RESEND_API_KEY:
+        print("Error: RESEND_API_KEY nahi mili environment variables mein")
+        return
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -15,10 +23,8 @@ def send_daily_reminders():
     try:
         cursor.execute("""
             SELECT 
-                u.id as user_id,
                 u.email,
                 COALESCE(u.full_name, 'Farmer') as full_name,
-                c.id as reminder_id,
                 c.crop_name,
                 c.field_name,
                 c.first_irrigation_date,
@@ -75,31 +81,39 @@ def send_daily_reminders():
             if not data["tasks"]:
                 continue
 
-            msg = Message(
-                subject="AgroX Reminder – Aaj Ke Zaroori Kaam!",
-                sender="arhumdoger@gmail.com",
-                recipients=[email]
-            )
-
             task_list = "<br>".join(data["tasks"])
-            msg.html = f"""
-            <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-                <h2 style="color: #2e7d32;">As-salāmu ʿalaikum {data['name']}!</h2>
-                <p>Yeh kaam abhi tak pending hain:</p>
-                <div style="background:#f9f9f9; padding:15px; border-radius:8px; font-size:16px;">
-                    {task_list}
+
+            payload = {
+                "from": f"AgroX <{FROM_EMAIL}>",
+                "to": [email],
+                "subject": "AgroX Reminder – Aaj Ke Zaroori Kaam!",
+                "html": f"""
+                <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                    <h2 style="color: #2e7d32;">As-salāmu ʿalaikum {data['name']}!</h2>
+                    <p>Yeh kaam abhi tak pending hain:</p>
+                    <div style="background:#f9f9f9; padding:15px; border-radius:8px; font-size:16px;">
+                        {task_list}
+                    </div>
+                    <br>
+                    <p><strong>Jaldi se AgroX app kholo aur "Done" mark kar do!</strong></p>
+                    <hr>
+                    <small>— AgroX Team<br>
                 </div>
-                <br>
-                <p><strong>Jaldi se AgroX app kholo aur "Done" mark kar do!</strong></p>
-                <hr>
-                <small>— AgroX Team<br>
-            </div>
-            """
+                """
+            }
+
+            headers = {
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            }
 
             try:
-                mail.send(msg)
-                print(f"Email Bheja → {email} ({len(data['tasks'])} tasks)")
-                sent_count += 1
+                response = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
+                if response.status_code == 200:
+                    print(f"Email Bheja → {email} ({len(data['tasks'])} tasks)")
+                    sent_count += 1
+                else:
+                    print(f"Resend Error → {email} | {response.text}")
             except Exception as e:
                 print(f"Email FAIL → {email} | Error: {e}")
 
