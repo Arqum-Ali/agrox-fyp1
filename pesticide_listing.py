@@ -8,6 +8,7 @@ from PIL import Image  # imghdr ki jagah Pillow se type detect
 import io
 import jwt
 import uuid
+from config import BASE_URL  # Ye line add kar do
 import cloudinary.uploader  # Cloudinary upload
 
 pesticide_listing = Blueprint('pesticide_listing', __name__)
