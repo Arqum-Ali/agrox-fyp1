@@ -13,8 +13,8 @@ from machinery_rentals import machinery_rental
 from pesticide_listing import pesticide_listing
 from reminder_views import reminder_bp
 from chat import chat_bp
-from machinery_rentals_display import machinery_display
-from daily_reminder_job import send_daily_reminders  # Daily reminder ke liye
+# from machinery_rentals_display import machinery_display  # <-- Ye line comment kar di (error fix)
+from daily_reminder_job import send_daily_reminders
 
 import cloudinary
 
@@ -37,7 +37,7 @@ def create_app():
     app.register_blueprint(pesticide_listing, url_prefix='/pesticide_listing')
     app.register_blueprint(reminder_bp, url_prefix='/reminder')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    app.register_blueprint(machinery_display)  # <-- url_prefix hata diya (error fix)
+    # app.register_blueprint(machinery_display)  # <-- Ye line comment kar di (error fix)
 
     @app.route('/')
     def home():
