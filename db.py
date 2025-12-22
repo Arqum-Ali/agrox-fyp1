@@ -1,12 +1,12 @@
 """
-Database connection for Supabase (PostgreSQL) - Windows friendly
+Database connection for Supabase (PostgreSQL) - Force IPv4 for Railway
 """
 import psycopg2
 from psycopg2.extras import DictCursor
 from config import SUPABASE_DB_HOST, SUPABASE_DB_PORT, SUPABASE_DB_NAME, SUPABASE_DB_USER, SUPABASE_DB_PASSWORD
 
 def get_db_connection():
-    """Supabase Postgres connection with separate parameters (Windows safe)"""
+    """Supabase Postgres connection with IPv4 forced (Railway fix)"""
     try:
         return psycopg2.connect(
             host=SUPABASE_DB_HOST,
@@ -14,7 +14,11 @@ def get_db_connection():
             database=SUPABASE_DB_NAME,
             user=SUPABASE_DB_USER,
             password=SUPABASE_DB_PASSWORD,
-            cursor_factory=DictCursor
+            cursor_factory=DictCursor,
+            # Force IPv4 - ye line add kar de (Railway pe zaruri)
+            sslmode='require',
+            connect_timeout=10,
+            options='-c binary_parameters=yes'
         )
     except Exception as e:
         print(f"Connection error: {e}")
