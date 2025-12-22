@@ -158,7 +158,9 @@ def get_my_reminders(current_user_id):
 
     except Exception as e:
         print(f"[REMINDER ERROR] get_my_reminders: {str(e)}")
-        return jsonify({"error": "Failed to fetch reminders"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch reminders: {str(e)}"}), 500
     finally:
         cursor.close()
         conn.close()
