@@ -16,6 +16,7 @@ from chat import chat_bp
 from machinery_rentals_display import machinery_display
 import cloudinary
 import cloudinary.uploader
+from daily_reminder_job import send_daily_reminders
 
 def create_app():
     app = Flask(__name__)
@@ -48,6 +49,10 @@ def create_app():
     app.register_blueprint(reminder_bp, url_prefix="/reminder")
     app.register_blueprint(chat_bp, url_prefix='/chat')
     app.register_blueprint(machinery_display, url_prefix='')
+    @app.route('/reminder/daily_job')
+    def daily_reminder_route():
+        send_daily_reminders()
+        return "Daily reminders sent successfully!", 200
 
     @app.route('/')
     def home():
