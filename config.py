@@ -17,10 +17,3 @@ CLOUDINARY_API_SECRET = 'IHHSJZDhUZaOG3-NiO-KfVzVKXY'
 # Resend Email Settings (new - Gmail ki jagah)
 RESEND_API_KEY = "re_SB36d9dp_LcLwKq3kAhnZacXnyyc3MBG3"
 RESEND_FROM_EMAIL = "onboarding@resend.dev"  # Default free email, baad mein custom domain verify kar sakte ho
-
-# Supabase Database Settings (separate parameters for Windows)
-SUPABASE_DB_HOST = "db.anfswqbjnasjcsllvibh.supabase.co"
-SUPABASE_DB_PORT = "5432"
-SUPABASE_DB_NAME = "postgres"
-SUPABASE_DB_USER = "postgres"
-SUPABASE_DB_PASSWORD = "ARhamali123@"  # Tera password
