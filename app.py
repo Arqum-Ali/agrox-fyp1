@@ -54,13 +54,12 @@ def create_app():
         return "Backend is running! Go to /machinery/rent_machinery to list machinery"
 
     return app
-
-
 if __name__ == '__main__':
+    import os
+    port = int(os.getenv('PORT', 5000))  # Railway $PORT use karega
     if init_db():
         app = create_app()
         print("Starting server...")
-        print("Local: http://127.0.0.1:5000")
-        app.run(host="0.0.0.0", port=5000, debug=DEBUG)
+        app.run(host="0.0.0.0", port=port, debug=DEBUG)
     else:
         print("Database connection failed!")
