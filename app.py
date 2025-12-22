@@ -14,12 +14,12 @@ from pesticide_listing import pesticide_listing
 from reminder_views import reminder_bp
 from chat import chat_bp
 from machinery_rentals_display import machinery_display
-from daily_reminder_job import send_daily_reminders  # Daily reminder ke liye add kiya
+from daily_reminder_job import send_daily_reminders  # Daily reminder ke liye
 
 import cloudinary
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 cloudinary.config(
     cloud_name=CLOUDINARY_CLOUD_NAME,
@@ -37,13 +37,12 @@ def create_app():
     app.register_blueprint(pesticide_listing, url_prefix='/pesticide_listing')
     app.register_blueprint(reminder_bp, url_prefix='/reminder')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    app.register_blueprint(machinery_display)  # <-- url_prefix='' hata diya (error fix)
+    app.register_blueprint(machinery_display)  # <-- url_prefix hata diya (error fix)
 
     @app.route('/')
     def home():
         return "Backend is running! Go to /machinery/rent_machinery to list machinery"
 
-    # Daily reminder emails ke liye route
     @app.route('/reminder/daily_job')
     def daily_reminder_route():
         send_daily_reminders()
@@ -53,7 +52,7 @@ def create_app():
 
 if __name__ == '__main__':
     import os
-    port = int(os.getenv('PORT', 5000))  # Railway $PORT use karega
+    port = int(os.getenv('PORT', 5000))
     if init_db():
         app = create_app()
         print("Starting server...")
