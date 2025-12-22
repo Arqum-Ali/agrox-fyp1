@@ -90,14 +90,17 @@ def create_or_get_room():
             conn.close()
             return jsonify({'room_id': room_id, 'other_user_id': seller_id}), 200
         
-        # Create new room
+               # Create new room
         cursor.execute("""
             INSERT INTO chat_rooms (buyer_id, seller_id, listing_id, listing_type)
             VALUES (%s, %s, %s, %s)
+            RETURNING id
         """, (buyer_id, seller_id, listing_id, listing_type))
-        conn.commit()
         
-        room_id = cursor.lastrowid
+        room_id_result = cursor.fetchone()
+        room_id = room_id_result['id']
+        
+        conn.commit()
         print(f"[CHAT] New room created: {room_id}")
         
         cursor.close()
