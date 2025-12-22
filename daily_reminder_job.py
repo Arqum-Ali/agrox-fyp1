@@ -1,20 +1,20 @@
-# daily_reminder_job.py - Fresh & Clean Version (Resend.com se emails bhejega)
+# daily_reminder_job.py - Direct Resend API call (same as signup/OTP style)
 
 from db import get_db_connection
 from datetime import date
 import os
 import requests
 
-# Resend API key Railway se le ga (jo tu ne signup ke liye add ki hai)
+# Railway environment variable se key le ga (jo tu ne signup ke liye add ki hai)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-FROM_EMAIL = "arhumdoger@gmail.com"  # Ya jo email Resend mein verified hai
+RESEND_FROM_EMAIL = "reminders@resend.dev"  # ya jo tu ne banaya wo daal
 
 def send_daily_reminders():
     today = date.today()
-    print(f"[{today}] Daily Reminder Job Start Ho Gaya... Resend se emails bhej raha hai")
+    print(f"[{today}] Daily Reminder Job Start — Resend API se emails bhej raha hai")
 
     if not RESEND_API_KEY:
-        print("Error: RESEND_API_KEY nahi mili — Railway mein add karo")
+        print("Error: RESEND_API_KEY nahi mili — Railway variables mein add karo")
         return
 
     conn = get_db_connection()
@@ -49,7 +49,6 @@ def send_daily_reminders():
             print("Aaj koi pending task nahi — email nahi bheji")
             return
 
-        # User wise group kar
         users = {}
         for row in rows:
             email = row["email"]
@@ -72,10 +71,9 @@ def send_daily_reminders():
 
             add_task("Pehli Irrigation", "first_irrigation_date", "first_irrigation_done")
             add_task("Doosri Irrigation", "second_irrigation_date", "second_irrigation_done")
-            add_task("Urea Dose", "urea_dose_date", "urea_dose_done")
+            add_task("Urea Dalna", "urea_dose_date", "urea_dose_done")
 
-        # Resend se emails bhej
-        sent = 0
+        sent_count = 0
         for email, data in users.items():
             if not data["tasks"]:
                 continue
@@ -83,18 +81,18 @@ def send_daily_reminders():
             task_list = "<br>".join(data["tasks"])
 
             payload = {
-                "from": f"AgroX <{FROM_EMAIL}>",
+                "from": RESEND_FROM_EMAIL,
                 "to": [email],
                 "subject": "AgroX Reminder — Aaj Ke Zaroori Kaam!",
                 "html": f"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
                     <h2 style="color: #1e5d5e;">As-salāmu ʿalaikum {data['name']} bhai!</h2>
-                    <p>Aaj ya pehle ke pending kaam:</p>
+                    <p>Pending kaam:</p>
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px;">
                         {task_list}
                     </div>
                     <br>
-                    <p><strong>App kholo aur "Done" mark kar do!</strong></p>
+                    <p><strong>AgroX app kholo aur "Done" mark kar do!</strong></p>
                     <p>— AgroX Team</p>
                 </div>
                 """
@@ -105,20 +103,22 @@ def send_daily_reminders():
                 "Content-Type": "application/json"
             }
 
+            url = "https://api.resend.com/emails"
+
             try:
-                response = requests.post("https://api.resend.com/emails", json=payload, headers=headers)
+                response = requests.post(url, json=payload, headers=headers)
                 if response.status_code == 200:
                     print(f"Email successfully bheji → {email}")
-                    sent += 1
+                    sent_count += 1
                 else:
-                    print(f"Resend error → {email} | {response.text}")
+                    print(f"Resend error → {email} | {response.json()}")
             except Exception as e:
                 print(f"Email send fail → {email} | {e}")
 
-        print(f"Total emails bheji gayi: {sent}")
+        print(f"Total emails bheji gayi: {sent_count}")
 
     except Exception as e:
-        print(f"Critical error: {e}")
+        print(f"Database error: {e}")
     finally:
         cursor.close()
         conn.close()
