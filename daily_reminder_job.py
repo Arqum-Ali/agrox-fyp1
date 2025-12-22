@@ -1,4 +1,5 @@
-# daily_reminder_job.py → FINAL 100% WORKING VERSION (November 2025)
+# daily_reminder_job.py — bilkul same rakha, sirf print statements add kiye testing ke liye
+
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # Agar backend folder mein hai to
@@ -22,7 +23,7 @@ with app.app_context():
         cursor = conn.cursor()
 
         try:
-            # Sirf pending tasks (done nahi hue) + date aaj ya pehle ki
+            # Sirf un tasks ke liye jo pending hain aur date aaj ya pehle ki
             cursor.execute("""
                 SELECT 
                     u.id as user_id,
@@ -94,7 +95,7 @@ with app.app_context():
                     recipients=[email]
                 )
 
-                task_list = "<br>".join(data["tasks"])
+                task_list = "<br>".join(data['tasks'])
                 msg.html = f"""
                 <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
                     <h2 style="color: #2e7d32;">As-salāmu ʿalaikum {data['name']}!</h2>
