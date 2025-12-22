@@ -14,7 +14,7 @@ from pesticide_listing import pesticide_listing
 from reminder_views import reminder_bp
 from chat import chat_bp
 from machinery_rentals_display import machinery_display
-from daily_reminder_job import send_daily_reminders  # <-- Ye line add ki hai
+from daily_reminder_job import send_daily_reminders  # Daily reminder ke liye add kiya
 
 import cloudinary
 
@@ -37,13 +37,13 @@ def create_app():
     app.register_blueprint(pesticide_listing, url_prefix='/pesticide_listing')
     app.register_blueprint(reminder_bp, url_prefix='/reminder')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    app.register_blueprint(machinery_display, url_prefix='')
+    app.register_blueprint(machinery_display)  # <-- url_prefix='' hata diya (error fix)
 
     @app.route('/')
     def home():
         return "Backend is running! Go to /machinery/rent_machinery to list machinery"
 
-    # YE NEW ROUTE ADD KI HAI — DAILY REMINDER EMAILS KE LIYE
+    # Daily reminder emails ke liye route
     @app.route('/reminder/daily_job')
     def daily_reminder_route():
         send_daily_reminders()
