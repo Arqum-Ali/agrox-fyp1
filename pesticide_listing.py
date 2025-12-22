@@ -155,7 +155,7 @@ def get_pesticides_by_user(user_id):
         cursor.execute("""
             SELECT user_id, id, name, price, quantity, description, 
                    organic_certified, restricted_use, local_delivery_available,
-                   image_path, created_at
+                   image_url, created_at
             FROM pesticides
             WHERE user_id = %s
         """, (user_id,))
@@ -166,8 +166,8 @@ def get_pesticides_by_user(user_id):
         formatted_pesticides = []
         for pesticide in pesticides:
             formatted_pesticide = dict(pesticide)
-            if pesticide.get('image_path'):
-                formatted_pesticide['image_url'] = f"{BASE_URL}/{pesticide['image_path']}"
+            if pesticide.get('image_url'):
+                formatted_pesticide['image_url'] = f"{BASE_URL}/{pesticide['image_url']}"
             else:
                 formatted_pesticide['image_url'] = None
             formatted_pesticides.append(formatted_pesticide)
@@ -201,11 +201,11 @@ def delete_pesticide(pesticide_id):
             return jsonify({'error': 'Pesticide not found'}), 404
 
         # Delete associated image if exists
-        image_path = pesticide.get('image_path')
-        if image_path and os.path.exists(image_path):
+        image_url = pesticide.get('image_url')
+        if image_url and os.path.exists(image_url):
             try:
-                os.remove(image_path)
-                print(f"[PESTICIDE DELETE] Deleted image: {image_path}")
+                os.remove(image_url)
+                print(f"[PESTICIDE DELETE] Deleted image: {image_url}")
             except Exception as e:
                 print(f"[PESTICIDE DELETE] Failed to delete image: {str(e)}")
 

@@ -12,7 +12,7 @@ def get_available_machinery():
     """
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)  # Returns dict instead of tuple
+        cursor = conn.cursor()  # DictCursor already set in get_db_connection()
         
         cursor.execute("""
             SELECT 
@@ -38,6 +38,9 @@ def get_available_machinery():
         # Format the response with proper image URLs
         formatted_listings = []
         for listing in listings:
+            # image_path now contains the full Cloudinary URL (not a local path)
+            image_url = listing['image_path'] if listing.get('image_path') else None
+            
             formatted_listing = {
                 'id': listing['id'],
                 'user_id': listing['user_id'],
@@ -48,7 +51,7 @@ def get_available_machinery():
                 'min_days': listing['min_days'],
                 'start_date': str(listing['start_date']),
                 'end_date': str(listing['end_date']),
-                'image_url': f"{BASE_URL}/{listing['image_path']}" if listing.get('image_path') else None,
+                'image_url': image_url,
                 'created_at': str(listing.get('created_at', ''))
             }
             formatted_listings.append(formatted_listing)
@@ -73,7 +76,7 @@ def get_machinery_details(machinery_id):
     """
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()  # DictCursor already set in get_db_connection()
         
         cursor.execute("""
             SELECT 
@@ -103,6 +106,9 @@ def get_machinery_details(machinery_id):
             }), 404
         
         # Format the response
+        # image_path now contains the full Cloudinary URL (not a local path)
+        image_url = listing['image_path'] if listing.get('image_path') else None
+        
         formatted_listing = {
             'id': listing['id'],
             'user_id': listing['user_id'],
@@ -113,7 +119,7 @@ def get_machinery_details(machinery_id):
             'min_days': listing['min_days'],
             'start_date': str(listing['start_date']),
             'end_date': str(listing['end_date']),
-            'image_url': f"{BASE_URL}/{listing['image_path']}" if listing.get('image_path') else None,
+            'image_url': image_url,
             'created_at': str(listing.get('created_at', ''))
         }
         
