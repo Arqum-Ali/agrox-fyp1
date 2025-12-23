@@ -163,15 +163,7 @@ def get_pesticides_by_user(user_id):
 
         pesticides = cursor.fetchall()
         
-        # Format listings with proper image URLs
-        formatted_pesticides = []
-        for pesticide in pesticides:
-            formatted_pesticide = dict(pesticide)
-            if pesticide.get('image_url'):
-                formatted_pesticide['image_url'] = f"{BASE_URL}/{pesticide['image_url']}"
-            else:
-                formatted_pesticide['image_url'] = None
-            formatted_pesticides.append(formatted_pesticide)
+        formatted_pesticides = [dict(pesticide) for pesticide in pesticides]
 
         cursor.close()
         conn.close()
@@ -249,19 +241,12 @@ def get_all_pesticides():
 
         pesticides = cursor.fetchall()
 
-        formatted = []
-        for p in pesticides:
-            item = dict(p)
-            item['image_url'] = p['image_url'] if p['image_url'] else None
-            formatted.append(item)
+        formatted = [dict(p) for p in pesticides]
 
         cursor.close()
         conn.close()
 
-        return jsonify({
-            "total": len(formatted),
-            "pesticides": formatted
-        }), 200
+        return jsonify(formatted), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

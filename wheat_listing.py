@@ -164,18 +164,7 @@ def get_wheat_listings():
         listings = cursor.fetchall()
         print(f"[WHEAT GET] Found {len(listings)} listings")
         
-        # Format listings with proper image URLs
-        formatted_listings = []
-        for listing in listings:
-            formatted_listing = dict(listing)
-            if listing.get('image_path'):
-                image_path = f"{BASE_URL}/{listing['image_path']}"
-                formatted_listing['image_path'] = image_path
-                print(f"[WHEAT GET] Listing {listing.get('id')}: image_path = {image_path}")
-            else:
-                formatted_listing['image_path'] = None
-                print(f"[WHEAT GET] Listing {listing.get('id')}: No image_path")
-            formatted_listings.append(formatted_listing)
+        formatted_listings = [dict(listing) for listing in listings]
         
         cursor.close()
         conn.close()
