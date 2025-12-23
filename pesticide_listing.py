@@ -222,3 +222,46 @@ def delete_pesticide(pesticide_id):
     except Exception as e:
         print(f"[PESTICIDE DELETE] Error: {str(e)}")
         return jsonify({'error': str(e)}), 500
+@pesticide_listing.route('/all', methods=['GET'])
+def get_all_pesticides():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                p.id,
+                p.user_id,
+                u.full_name as seller_name,
+                p.name,
+                p.price,
+                p.quantity,
+                p.description,
+                p.organic_certified,
+                p.restricted_use,
+                p.local_delivery_available,
+                p.image_url,
+                p.created_at
+            FROM pesticides p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.created_at DESC
+        """)
+
+        pesticides = cursor.fetchall()
+
+        formatted = []
+        for p in pesticides:
+            item = dict(p)
+            item['image_url'] = p['image_url'] if p['image_url'] else None
+            formatted.append(item)
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "total": len(formatted),
+            "pesticides": formatted
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
