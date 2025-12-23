@@ -178,7 +178,7 @@ def get_user_rooms():
                 try:
                     if listing_type == 'machinery':
                         cursor.execute(f"""
-                            SELECT id, name, dailyRate, imagePath FROM {table_name} WHERE id = %s
+                            SELECT id, name, daily_rate as dailyRate, image_path as imagePath FROM {table_name} WHERE id = %s
                         """, (listing_id,))
                     elif listing_type == 'pesticide':
                         cursor.execute(f"""
@@ -186,7 +186,7 @@ def get_user_rooms():
                         """, (listing_id,))
                     elif listing_type == 'wheat':
                         cursor.execute(f"""
-                            SELECT id, title, pricePerKg FROM {table_name} WHERE id = %s
+                            SELECT id, title, price_per_kg as pricePerKg FROM {table_name} WHERE id = %s
                         """, (listing_id,))
                     
                     listing_result = cursor.fetchone()
