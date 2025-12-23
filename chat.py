@@ -255,6 +255,10 @@ def get_messages(room_id):
         """, (room_id,))
        
         messages = cursor.fetchall()
+        
+        messages_list = [dict(msg) for msg in messages]
+        
+        print(f"[CHAT] Retrieved {len(messages_list)} messages for room {room_id}")
        
         cursor.execute("""
             UPDATE chat_messages
@@ -271,7 +275,7 @@ def get_messages(room_id):
         cursor.close()
         conn.close()
        
-        return jsonify({'messages': messages}), 200
+        return jsonify({'messages': messages_list}), 200
        
     except Exception as e:
         print(f"[CHAT ERROR] get_messages: {str(e)}")
@@ -339,6 +343,8 @@ def send_message(room_id):
             'sender_name': 'Current User',
             'sender_image': 'placeholder.jpg'
         }
+        
+        print(f"[CHAT] Message sent successfully to room {room_id}")
         
         cursor.close()
         conn.close()
